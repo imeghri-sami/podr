@@ -1,0 +1,7 @@
+import java.rmi.Remote;
+
+public interface SharedObject_itf extends Remote {
+
+    // ????????????
+
+}
