@@ -24,7 +24,10 @@ public class SharedObject implements Serializable, SharedObject_itf {
             Client.monitor.feuVert(Client.getIdSite(),4); // ** Instrumentation
          	// ** attente quadruplée pour les ack, pour exhiber l'inversion de valeurs
          	// getIdSite identique à getSite, mais non Remote
-         	
+
+
+
+
          	// suite de la méthode update... 
          	
         } catch (RemoteException e) {
@@ -83,4 +86,7 @@ public class SharedObject implements Serializable, SharedObject_itf {
         return this.id;
     }
 
+    public String getVersion() {
+        return "";
+    }
 }

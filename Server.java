@@ -15,13 +15,16 @@ public class Server extends UnicastRemoteObject implements Server_itf {
 
     private HashMap<String, Integer> bindingMap;
 
+    //Les copies maitres
     private HashMap<Integer, Object> objects;
 
     private HashMap<Integer, AtomicInteger> versions;
     // private HashMap<Integer, Set<Client_itf>> clients;
     private AtomicInteger atomicInteger;
     private Set<Client_itf> clients;
-    private final int barriere = 10;
+
+    private Client_itf writer;
+    private int barriere = 10;
 
     private Moniteur serverMonitor;
 
@@ -56,7 +59,7 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     public Set<Client_itf> addClient(Client_itf client) throws RemoteException {
 
 
-        while (clients.size() >= barriere) {
+        while (clients.size() >= barriere - 1) {
             try {
                 wait();
             } catch (InterruptedException e) {
@@ -66,9 +69,18 @@ public class Server extends UnicastRemoteObject implements Server_itf {
 
         clients.add(client);
 
-        if (clients.size() == barriere) {
+        if (clients.size() == barriere - 1) {
             notifyAll();
         }
+        return clients;
+    }
+
+    public Set<Client_itf> addWriter(Client_itf client){
+
+        barriere += 1;
+        clients.add(client);
+        writer = client;
+
         return clients;
     }
 
@@ -131,5 +143,9 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     public Moniteur getMonitor() throws RemoteException {
         return serverMonitor;
     }
+
+    /*public int getVersion(Integer id) {
+        return versions.get(id);
+    }*/
 
 }

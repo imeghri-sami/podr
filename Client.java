@@ -34,13 +34,13 @@ public class Client extends UnicastRemoteObject implements Client_itf {
     @Override
     public void initSO(int idObj, Object valeur) throws RemoteException {
         SharedObject so = new SharedObject(idObj, valeur);
-        sharedObjects.add(so);
+        sharedObjects.add(idObj, so);
     }
 
     @Override
     public void reportValue(int idObj, ReadCallback rcb) throws RemoteException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'reportValue'");
+        SharedObject so = sharedObjects.get(idObj);
+        so.reportValue(rcb);
     }
 
     @Override
@@ -62,7 +62,8 @@ public class Client extends UnicastRemoteObject implements Client_itf {
 
     @Override
     public int getVersion(String name) throws RemoteException {
-        throw new UnsupportedOperationException("Unimplemented method 'getVersion'");
+        int id = server.lookup(name);
+
     }
 
     public static void init(String myName) {
@@ -82,14 +83,15 @@ public class Client extends UnicastRemoteObject implements Client_itf {
         }
     }
 
-    public static SharedObject publish(String string, String string2, boolean b) {
+    public static SharedObject publish(String string, String obj, boolean b) {
+        int id = 0;
         try {
-            server.publish(string, string2, b);
+            id = server.publish(string, obj, b);
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
-        //TODO : return shared object
-        return null;
+
+        return sharedObjects.get(id);
     }
 
     public static SharedObject lookup(String objname) {
