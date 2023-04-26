@@ -88,6 +88,8 @@ public class Client extends UnicastRemoteObject implements Client_itf {
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
+        //TODO : return shared object
+        return null;
     }
 
     public static SharedObject lookup(String objname) {

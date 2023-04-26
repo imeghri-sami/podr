@@ -8,6 +8,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Server extends UnicastRemoteObject implements Server_itf {
 
@@ -22,6 +24,7 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     private final int barriere = 10;
 
     private Moniteur serverMonitor;
+
 
     protected Server() throws RemoteException {
         bindingMap = new HashMap<>();
@@ -51,15 +54,22 @@ public class Server extends UnicastRemoteObject implements Server_itf {
 
     @Override
     public Set<Client_itf> addClient(Client_itf client) throws RemoteException {
-        if (clients.size() >= barriere) {
-            return null;
-        } else {
-            clients.add(client);
-            while (clients.size() < barriere) {
-                clients.add(client);
+
+
+        while (clients.size() >= barriere) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
-            return clients;
         }
+
+        clients.add(client);
+
+        if (clients.size() == barriere) {
+            notifyAll();
+        }
+        return clients;
     }
 
     @Override
@@ -96,7 +106,13 @@ public class Server extends UnicastRemoteObject implements Server_itf {
 
 
         clients.forEach(
-            c -> c.update(idObjet, newVersion, valeur, /*?????? WriteCallback*/ null)
+            c -> {
+                try {
+                    c.update(idObjet, newVersion, valeur, /*?????? WriteCallback*/ null);
+                } catch (RemoteException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         );
 
         return newVersion;
@@ -105,8 +121,9 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     @Override
     public Set<Client_itf> setMonitor(Moniteur m) throws RemoteException {
         serverMonitor = m;
-        // attendre que les clients soient prets
+
         while (clients.size() < barriere);
+
         return clients;
     }
 
