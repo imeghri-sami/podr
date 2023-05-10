@@ -43,7 +43,7 @@ public class SharedObject implements Serializable, SharedObject_itf {
             // int version = versions.get(idObj).get();
             Client_itf client = null;
             for (Client_itf c : clientsParticipants) {
-                if (version < c.getVersion(idObj)) {
+                if (version <= c.getVersion(idObj)) {
                     version = c.getVersion(idObj);
                     client = c;
                 }
@@ -91,6 +91,7 @@ public class SharedObject implements Serializable, SharedObject_itf {
 
             reportValue(null);
 
+            System.out.println("read::obj ----> " + obj);
             Client.monitor.signaler("TL", Client.getIdSite(), idObj); // ** Instrumentation
             return obj;
         } catch (RemoteException rex) {

@@ -15,7 +15,7 @@ public class Client extends UnicastRemoteObject implements Client_itf {
     private static HashMap<Integer, SharedObject> sharedObjects;
     private static Set<Client_itf> clientsParticipants;
 
-    private static HashMap<Integer, AtomicInteger> versions; // Ajout d'une map de correspondance entre les shared
+    //private static HashMap<Integer, AtomicInteger> versions; // Ajout d'une map de correspondance entre les shared
     // objects et leurs versions. Util??
     private static Client instanceClient;
     private static Server_itf server;
@@ -61,7 +61,7 @@ public class Client extends UnicastRemoteObject implements Client_itf {
         SharedObject so = new SharedObject(idObj, valeur);
         so.setClients(clientsParticipants);
         sharedObjects.put(idObj, so);
-        versions.put(idObj, new AtomicInteger(0));
+        //versions.put(idObj, new AtomicInteger(0));
     }
 
     /*
@@ -119,7 +119,7 @@ public class Client extends UnicastRemoteObject implements Client_itf {
        // wcb.ok();
         SharedObject so = sharedObjects.get(idObj);
         so.setObj(valeur);
-        versions.get(idObj).set(version);
+        //versions.get(idObj).set(version);
         so.setVersion(version);
 
         System.out.println("objet : " + so.getObj());
@@ -148,8 +148,7 @@ public class Client extends UnicastRemoteObject implements Client_itf {
     @Override
     public int getVersion(String name) throws RemoteException {
         int idObj = server.lookup(name);
-        AtomicInteger version = versions.get(sharedObjects.get(idObj));
-        return version.get();
+        return Integer.parseInt(sharedObjects.get(idObj).getVersion());
     }
 
     @Override
@@ -159,8 +158,7 @@ public class Client extends UnicastRemoteObject implements Client_itf {
 
     @Override
     public int getVersion(Integer idObj) throws RemoteException {
-        AtomicInteger version = versions.get(sharedObjects.get(idObj));
-        return version.get();
+        return Integer.parseInt(sharedObjects.get(idObj).getVersion());
     }
 
     public static void init(String myName) {
@@ -175,7 +173,7 @@ public class Client extends UnicastRemoteObject implements Client_itf {
             Client.name = myName;
             sharedObjects = new HashMap<>();
             instanceClient = new Client();
-            versions = new HashMap<>();
+            //versions = new HashMap<>();
             clientsParticipants = server.addClient(instanceClient);
             if ( clientsParticipants == null) System.exit(0);
 
