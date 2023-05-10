@@ -1,2 +1,2 @@
-public class ReadCallback {
+public interface ReadCallback {
 }

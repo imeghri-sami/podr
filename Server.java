@@ -5,17 +5,16 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
+
+import static java.lang.Thread.sleep;
 
 public class Server extends UnicastRemoteObject implements Server_itf {
 
     private HashMap<String, Integer> bindingMap;
 
-    //Les copies maitres
+    // Les copies maitres
     private HashMap<Integer, Object> objects;
 
     private HashMap<Integer, AtomicInteger> versions;
@@ -24,10 +23,9 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     private Set<Client_itf> clients;
 
     private Client_itf writer;
-    private int barriere = 10;
+    private int barriere = 2;
 
     private Moniteur serverMonitor;
-
 
     protected Server() throws RemoteException {
         bindingMap = new HashMap<>();
@@ -39,9 +37,9 @@ public class Server extends UnicastRemoteObject implements Server_itf {
         clients = new HashSet<>();
     }
 
-
     static final int RMI_REGISTRY_PORT = 50051;
     static final String RMI_REGISTRY_HOSTNAME = "localhost";
+
     public static void main(String[] args) {
         try {
             Server server = new Server();
@@ -54,28 +52,40 @@ public class Server extends UnicastRemoteObject implements Server_itf {
         }
     }
 
-
     @Override
     public Set<Client_itf> addClient(Client_itf client) throws RemoteException {
 
+        //if ( clients.size() > barriere ) return null;
 
-        while (clients.size() >= barriere - 1) {
+        /*while ( clients.size() < barriere ) {
             try {
+                clients.add(client);
                 wait();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }*/
+
+        if ( clients.size() >= barriere ) return null;
+
+        clients.add(client);
+
+        while ( clients.size() < barriere ){
+            try {
+                sleep(2*1000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        clients.add(client);
-
-        if (clients.size() == barriere - 1) {
-            notifyAll();
-        }
         return clients;
     }
 
-    public Set<Client_itf> addWriter(Client_itf client){
+    public boolean isWriter(Client_itf client) throws RemoteException {
+        return client.equals(writer);
+    }
+
+    public Set<Client_itf> addWriter(Client_itf client) {
 
         barriere += 1;
         clients.add(client);
@@ -118,14 +128,15 @@ public class Server extends UnicastRemoteObject implements Server_itf {
 
 
         clients.forEach(
-            c -> {
-                try {
-                    c.update(idObjet, newVersion, valeur, /*?????? WriteCallback*/ null);
-                } catch (RemoteException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        );
+                c -> {
+                    try {
+                        System.out.println("debut update");
+                        c.update(idObjet, newVersion, valeur, /* ?????? WriteCallback */ null);
+                        System.out.println("fin update");
+                    } catch (RemoteException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
 
         return newVersion;
     }
@@ -134,8 +145,15 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     public Set<Client_itf> setMonitor(Moniteur m) throws RemoteException {
         serverMonitor = m;
 
-        while (clients.size() < barriere);
+        System.out.println("waiting for clients ... " + barriere);
 
+
+        while (clients.size() < barriere)
+            ;
+
+        for (Client_itf c : clients) {
+            c.setMonitor(m);
+        }
         return clients;
     }
 
@@ -144,8 +162,8 @@ public class Server extends UnicastRemoteObject implements Server_itf {
         return serverMonitor;
     }
 
-    /*public int getVersion(Integer id) {
-        return versions.get(id);
-    }*/
+    public int getVersion(Integer id) {
+        return versions.get(id).get();
+    }
 
 }

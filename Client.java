@@ -2,17 +2,21 @@ import java.net.MalformedURLException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
+import java.rmi.server.RemoteServer;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Client extends UnicastRemoteObject implements Client_itf {
 
     private static final int RMI_REGISTRY_PORT = 50051;
     private static final String RMI_REGISTRY_HOSTNAME = "localhost";
-    private static List<SharedObject> sharedObjects;
+    private static HashMap<Integer, SharedObject> sharedObjects;
     private static Set<Client_itf> clientsParticipants;
 
+    private static HashMap<Integer, AtomicInteger> versions; // Ajout d'une map de correspondance entre les shared
+    // objects et leurs versions. Util??
     private static Client instanceClient;
     private static Server_itf server;
 
@@ -28,25 +32,98 @@ public class Client extends UnicastRemoteObject implements Client_itf {
         return name;
     }
 
-    public static void write(Integer id, Object o) {
+    public static void write(Integer id, Object o) throws RemoteException {
+        //if (server.isWriter(instanceClient))
+            server.write(id, o);
     }
+
+    /*
+     * reads the shared object of id id
+     * 
+     * public static Object read(Integer id) {
+     * SharedObject so = sharedObjects.get(id);
+     * 
+     * so.read();
+     * 
+     * try {
+     * instanceClient.reportValue(id, null); // note: cannot call the method
+     * reportValue (logically) because
+     * // there is no callback
+     * } catch (Exception e) {
+     * e.getMessage();
+     * }
+     * return sharedObjects.get(id);
+     * }
+     */
 
     @Override
     public void initSO(int idObj, Object valeur) throws RemoteException {
         SharedObject so = new SharedObject(idObj, valeur);
-        sharedObjects.add(idObj, so);
+        so.setClients(clientsParticipants);
+        sharedObjects.put(idObj, so);
+        versions.put(idObj, new AtomicInteger(0));
     }
 
+    /*
+     * Update : the method reportValue now does the same thing as lookFor but
+     * updates the shared object at the same time
+     * Problem : doesn't call the method report value of shared object
+     */
     @Override
     public void reportValue(int idObj, ReadCallback rcb) throws RemoteException {
+
         SharedObject so = sharedObjects.get(idObj);
         so.reportValue(rcb);
+
+        /*
+         * int version = versions.get(idObj).get();
+         * Client_itf client = null;
+         * for (Client_itf c : clientsParticipants) {
+         * if (version < c.getVersion(idObj)) {
+         * version = c.getVersion(idObj);
+         * client = c;
+         * }
+         * 
+         * }
+         * if (client != null) {
+         * Object o = client.getObj(idObj);
+         * SharedObject so = sharedObjects.get(idObj);
+         * so.setObj(o);
+         * versions.get(so).set(version);
+         * }
+         */
+
     }
+
+    /*
+     * This method will look for the client who has the highest version of an object
+     * and return the object
+     * 
+     * public static Object lookFor(int idObj) {
+     * int version = 0;
+     * Client_itf client = null;
+     * for (Client_itf c : clientsParticipants) {
+     * if (version < c.getVersion(idObj)) {
+     * version = c.getVersion(idObj);
+     * client = c;
+     * }
+     * 
+     * }
+     * return client.getObj(idObj);
+     * 
+     * }
+     */
 
     @Override
     public void update(int idObj, int version, Object valeur, WriteCallback wcb) throws RemoteException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'update'");
+       // wcb.ok();
+        SharedObject so = sharedObjects.get(idObj);
+        so.setObj(valeur);
+        versions.get(idObj).set(version);
+        so.setVersion(version);
+
+        System.out.println("objet : " + so.getObj());
+        System.out.println("version : " + so.getVersion() );
     }
 
     @Override
@@ -56,14 +133,34 @@ public class Client extends UnicastRemoteObject implements Client_itf {
 
     @Override
     public Object getObj(String name) throws RemoteException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getObj'");
+        int id = server.lookup(name);
+        Object o = sharedObjects.get(id).getObj();
+        return o;
     }
 
     @Override
-    public int getVersion(String name) throws RemoteException {
-        int id = server.lookup(name);
+    public Object getObj(int id) throws RemoteException {
+        Object o = sharedObjects.get(id).getObj();
+        return o;
+    }
 
+    /* Get la version d'un objet chez le client à partir de son nom. Util?? */
+    @Override
+    public int getVersion(String name) throws RemoteException {
+        int idObj = server.lookup(name);
+        AtomicInteger version = versions.get(sharedObjects.get(idObj));
+        return version.get();
+    }
+
+    @Override
+    public void setMonitor(Moniteur m) throws RemoteException {
+        monitor = m;
+    }
+
+    @Override
+    public int getVersion(Integer idObj) throws RemoteException {
+        AtomicInteger version = versions.get(sharedObjects.get(idObj));
+        return version.get();
     }
 
     public static void init(String myName) {
@@ -76,8 +173,14 @@ public class Client extends UnicastRemoteObject implements Client_itf {
                 System.out.println("Server null");
             // Initialiser le nom du site
             Client.name = myName;
+            sharedObjects = new HashMap<>();
             instanceClient = new Client();
+            versions = new HashMap<>();
             clientsParticipants = server.addClient(instanceClient);
+            if ( clientsParticipants == null) System.exit(0);
+
+
+            //monitor = server.getMonitor();
         } catch (NotBoundException | MalformedURLException | RemoteException e) {
             e.printStackTrace();
         }
@@ -101,14 +204,14 @@ public class Client extends UnicastRemoteObject implements Client_itf {
             if (objectReference == -1)
                 return null;
 
-            SharedObject obj = sharedObjects
+            SharedObject obj = sharedObjects.values()
                     .stream()
                     .filter(e -> e.getId() == objectReference)
                     .findFirst().orElse(null);
             if (obj == null) {
                 // add the shared object to the list
                 obj = new SharedObject(objectReference);
-                sharedObjects.add(obj);
+                sharedObjects.put(objectReference, obj);
             }
 
             return obj;

@@ -5,6 +5,6 @@ public interface Moniteur extends Remote {
 	public void feuVert(String site, int facteur) throws RemoteException; 
 	// minimal (indistinct, pas de trace) 
 
-	public void signaler(String événement, String site, int idRegistre) throws RemoteException; 
+	public void signaler(String evenement, String site, int idRegistre) throws RemoteException;
 	// événement = "DE","TE","DL",TL"
 }

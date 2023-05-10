@@ -17,10 +17,10 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
      * RMI *
      *******/
     private static String hostname = "localhost";	// server site address
-    private static int port = 4000;
+    private static int port = 50051;
 
-    private static Server_itf server;		// référence du serveur distant
-    private static Moniteur monMon;		    // référence distante du moniteur
+    private static Server_itf server;		// reference du serveur distant
+    private static Moniteur monMon;		    // reference distante du moniteur
     private static Set<Client_itf> sites = new HashSet<Client_itf>();// ensemble des sites
 
     private static HashSet<String> suivis = new HashSet<String>();// registres suivis
@@ -28,30 +28,30 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
     // table inverse pour les registres suivis (id->nom)
     // (bof (on impose que les noms soient univoques et stables), mais bon...)
 
-    private static HashMap<String,Integer> délais = new HashMap<String,Integer>();
+    private static HashMap<String,Integer> delais = new HashMap<String,Integer>();
     private static int largeurC0 = 4; // "site"
-    // nom site -> délai de réponse du site
+    // nom site -> delai de reponse du site
 
     public MoniteurImpl() throws RemoteException {
         super();
     }
 
 
-    // démarrage du moniteur
+    // demarrage du moniteur
     public static void init() {
         try {
             Moniteur monMon = new MoniteurImpl();
-            server = (Server_itf) Naming.lookup("//"+hostname+":"+port+"/Server");
+            server = (Server_itf) Naming.lookup("//"+hostname+":"+port+"/server");
             System.out.println("Bound to Server");
-            //attendre que tous les sites soient prêts et en récupérer la liste
+            //attendre que tous les sites soient prêts et en recuperer la liste
             sites = server.setMonitor(monMon);
             System.out.println("Tout le monde est prêt.");
             for (Client_itf s : sites) {
                 String nomSite = s.getSite();
-                // évaluer la largeur de la colonne sites des tableaux
+                // evaluer la largeur de la colonne sites des tableaux
                 largeurC0 = Math.max(largeurC0, nomSite.length());
-                //initialiser délais à "indéterminé"
-                délais.put(nomSite,-1);
+                //initialiser delais à "indetermine"
+                delais.put(nomSite,-1);
             }
         } catch (Exception ex) {
             System.out.println("Server error: " + ex.getMessage());
@@ -69,12 +69,13 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
         int d = 0;
         try {
         for (int i=0; i<facteur; i++) {
-        	d = délais.get(site);
+        	d = delais.get(site);
             while (d == -1) {
+                System.out.println("d == -1");
                 Thread.sleep(10000);
-                d = délais.get(site);
+                d = delais.get(site);
             }
-            if (d == -2) Thread.sleep(1_800_000_000); // une implémentation de l'infini
+            if (d == -2) Thread.sleep(1_800_000_000); // une implementation de l'infini
             else Thread.sleep(d*1000);
             }
         } catch (InterruptedException iex) {
@@ -84,10 +85,10 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
         return;
     }
 
-    public void signaler(String événement,String site,int idReg) throws RemoteException {
+    public void signaler(String evenement,String site,int idReg) throws RemoteException {
         String registre = suivisInv.get(idReg);
         if (suivis.contains(registre)) {
-            System.out.println(site + " : " + événement);
+            System.out.println(site + " : " + evenement);
             listerRegistre(registre);
         }
     }
@@ -99,7 +100,7 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
         System.out.printf("|%"+ (largeurC0 + 2) + "s |  valeur  |  version  |\n", "site");
         System.out.println("-".repeat(largeurC0 + 28));
 
-        // lignes justifiées
+        // lignes justifiees
         try {
             for (Client_itf s : sites) {
                 System.out.printf("|%"+(largeurC0+2)+"s | %8s | %9s |\n",s.getSite(),s.getObj(name),s.getVersion(name));
@@ -116,14 +117,14 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
         else if (d == -2) return "X";
         else return String.valueOf(d);
     }
-    public static void listerDélais() {
+    public static void listerDelais() {
         // en-tête
         System.out.println("-".repeat(largeurC0+15));
-        // lignes justifiées
+        // lignes justifiees
         try {
             for (Client_itf s : sites) {
                 String nomSite = s.getSite();
-                System.out.printf("|%"+(largeurC0+2)+"s | %7s |\n", nomSite,afficher(délais.get(nomSite)));
+                System.out.printf("|%"+(largeurC0+2)+"s | %7s |\n", nomSite,afficher(delais.get(nomSite)));
             }
         } catch (RemoteException rex) {
             System.out.println("erreur accès client : " + rex.getMessage());
@@ -172,7 +173,7 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
     }
 
     public static void main(String[] args) throws Exception {
-        MoniteurImpl.init(); // démarrage RMI
+        MoniteurImpl.init(); // demarrage RMI
 
         Map actions = new HashMap();
 
@@ -224,7 +225,7 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
 
         actions.put ("cliche", new Action() {
             public void run (String[] args) {
-                if (args[1].equals("--d")) listerDélais();
+                if (args[1].equals("--d")) listerDelais();
                 else if (args[1].equals("*")) {
                     try {
                         System.out.println ("============");
@@ -244,11 +245,11 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
             }
         });
         actions.put ("c", actions.get("cliche"));
-        actions.put ("cliché", actions.get("cliche"));
+        actions.put ("cliche", actions.get("cliche"));
 
         actions.put ("delai", new Action() {
             public void run (String[] args) {
-                int d = -1 ; // attente indéterminée
+                int d = -1 ; // attente indeterminee
                 //analyse des paramètres
                 if (args.length == 1) throw new IllegalArgumentException("??? (nom inconnu)");
                 if (args.length == 3) {
@@ -258,10 +259,10 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
                             d = Integer.parseInt (args[2]);
                             if (d < -2)  {
                                 d=-1;
-                                System.out.println ("??? (délai hors bornes)");
+                                System.out.println ("??? (delai hors bornes)");
                             }
                         } catch (NumberFormatException nfx) {
-                            throw new IllegalArgumentException("??? (délai non entier)");
+                            throw new IllegalArgumentException("??? (delai non entier)");
                         }
                 }
 
@@ -269,15 +270,15 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
                 if (name.equals("*")) {
                     try {
                         for (Client_itf s : sites) {
-                            if (délais.get(s.getSite()) > -2) délais.put(s.getSite(),d);
+                            if (delais.get(s.getSite()) > -2) delais.put(s.getSite(),d);
                         }
                     } catch (RemoteException rex) {
                         System.out.println("erreur accès client : " + rex.getMessage());
                         rex.printStackTrace();
                     }
                 } else {
-                    if (délais.keySet().contains(name)) {
-                        if (délais.get(name) > -2) délais.put(name,d);
+                    if (delais.keySet().contains(name)) {
+                        if (delais.get(name) > -2) delais.put(name,d);
                         else System.out.println ("??? (site en panne)");
                     }
                     else System.out.println ("??? (nom de site inconnu)");
@@ -285,7 +286,7 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
             }
         });
         actions.put ("d", actions.get("delai"));
-        actions.put ("délai", actions.get("delai"));
+        actions.put ("delai", actions.get("delai"));
 
         actions.put ("quitter", new Action() {
             public void run (String[] args) {
