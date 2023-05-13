@@ -23,7 +23,7 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     private Set<Client_itf> clients;
 
     private Client_itf writer;
-    private int barriere = 2;
+    private int barriere = 3;
 
     private Moniteur serverMonitor;
 
@@ -54,31 +54,25 @@ public class Server extends UnicastRemoteObject implements Server_itf {
 
     @Override
     public Set<Client_itf> addClient(Client_itf client) throws RemoteException {
-
-        //if ( clients.size() > barriere ) return null;
-
-        /*while ( clients.size() < barriere ) {
-            try {
-                clients.add(client);
-                wait();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+        synchronized (this) {
+            if (clients.size() >= barriere) {
+                return null;
             }
-        }*/
 
-        if ( clients.size() >= barriere ) return null;
+            clients.add(client);
 
-        clients.add(client);
-
-        while ( clients.size() < barriere ){
-            try {
-                sleep(2*1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            while (clients.size() < barriere) {
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
+
+            notifyAll();
+
+            return clients;
         }
-
-        return clients;
     }
 
     public boolean isWriter(Client_itf client) throws RemoteException {
@@ -101,8 +95,11 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     }
 
     @Override
-    public int publish(String name, Object o, boolean reset) throws RemoteException {
+    public synchronized int publish(String name, Object o, boolean reset) throws RemoteException {
         int id = atomicInteger.incrementAndGet();
+
+        if( bindingMap.containsKey(name)) return bindingMap.get(name);
+
         bindingMap.put(name, id);
         objects.put(id, o);
         versions.put(id, new AtomicInteger(0));
@@ -122,22 +119,42 @@ public class Server extends UnicastRemoteObject implements Server_itf {
     @Override
     public int write(int idObjet, Object valeur) throws RemoteException {
 
+        // Incrementer la version du l object qui a comme identifiant idObjet
         int newVersion = versions.get(idObjet).incrementAndGet();
-
+        // Ajouter la nouvelle valeur à la liste des objets
         objects.put(idObjet, valeur);
 
+        WriteCallback responseCllbck = new WriteCallbackImpl();
 
+        // Envoyer des updates à tous les clients et attender la réponse des clients
         clients.forEach(
                 c -> {
-                    try {
+
                         System.out.println("debut update");
-                        c.update(idObjet, newVersion, valeur, /* ?????? WriteCallback */ null);
+                        new Thread(() -> {
+                            try {
+                                c.update(idObjet, newVersion, valeur, responseCllbck);
+                            } catch (RemoteException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }).start();
                         System.out.println("fin update");
-                    } catch (RemoteException e) {
-                        throw new RuntimeException(e);
-                    }
+                        System.out.println("recuperer le nombre des reponses reçues ...");
+
                 });
 
+        //synchronized (this) {
+            /*   while( responseCllbck.getResponseCounter() < ( barriere / 2 ) ){
+
+             try {
+                    wait();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }*/
+            //notifyAll();
+        //}
+        System.out.println("fin while server write");
         return newVersion;
     }
 

@@ -1,6 +1,8 @@
 import java.io.*;
 import java.rmi.RemoteException;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class SharedObject implements Serializable, SharedObject_itf {
 
@@ -28,7 +30,14 @@ public class SharedObject implements Serializable, SharedObject_itf {
             // ** attente quadruplée pour les ack, pour exhiber l'inversion de valeurs
             // getIdSite identique à getSite, mais non Remote
 
-            // suite de la méthode update...
+            this.obj = valeur;
+
+            this.version = v;
+
+            // Envoyer un ACK au serveur
+            wcb.call();
+            System.out.println("objet : " + obj);
+            System.out.println("version : " + version );
 
         } catch (RemoteException e) {
             throw new RuntimeException(e);
@@ -37,25 +46,29 @@ public class SharedObject implements Serializable, SharedObject_itf {
 
     public void reportValue(ReadCallback rcb) {
         try {
-            System.out.println("feuvert");
             Client.monitor.feuVert(Client.getIdSite(), 1); // ** Instrumentation
-            System.out.println("feuvert'");
             // int version = versions.get(idObj).get();
+
             Client_itf client = null;
-            for (Client_itf c : clientsParticipants) {
+            /*for (Client_itf c : clientsParticipants) {
                 if (version <= c.getVersion(idObj)) {
                     version = c.getVersion(idObj);
                     client = c;
                 }
 
-            }
+            }*/
 
+            /*clientsParticipants.forEach(c -> {
+                try {
+                    c.reportValue(idObj, rcb);
+                } catch (RemoteException e) {
+                    throw new RuntimeException(e);
+                }
+            });*/
 
-            if (client != null) {
-                System.out.println("version --> " + version + "Client name ---> " + client.getSite());
-                Object o = client.getObj(idObj);
-                this.setObj(o);
-            }
+            rcb.call(version, obj);
+
+            // attendre la reponse de n/2 clients
 
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -85,15 +98,40 @@ public class SharedObject implements Serializable, SharedObject_itf {
             Client.monitor.signaler("DL", Client.getIdSite(), idObj); // ** Instrumentation
 
             // corps de la méthode read...
-            // First attempt to implement the read method:
-            // Client.reportValue(id, null); // Report value is not static
-            // Object obj = Client.read(this.idObj);
+            ReadCallback readCallback = new ReadCallbackImpl();
+            int numThreads = clientsParticipants.size();
+            Thread[] clientThreads = new Thread[numThreads];
+            CountDownLatch latch = new CountDownLatch(numThreads);
 
-            reportValue(null);
+            int index = 0;
 
-            System.out.println("read::obj ----> " + obj);
+            for( Client_itf c : clientsParticipants ){
+                clientThreads[index] = new Thread(() -> {
+                    try {
+                        c.reportValue(idObj, readCallback);
+                    } catch (RemoteException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                clientThreads[index++].start();
+            }
+
+            try {
+                latch.await(numThreads/2, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            System.out.println("Half clients have finished ...");
+            //reportValue(readCallback);
+
+            this.version = readCallback.getMaxVersion();
+            this.obj = readCallback.getValue();
+
+            assert this.obj != null;
+
             Client.monitor.signaler("TL", Client.getIdSite(), idObj); // ** Instrumentation
-            return obj;
+            return this.obj;
         } catch (RemoteException rex) {
             rex.printStackTrace();
             return null;

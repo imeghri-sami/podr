@@ -71,7 +71,6 @@ public class MoniteurImpl extends UnicastRemoteObject implements Moniteur {
         for (int i=0; i<facteur; i++) {
         	d = delais.get(site);
             while (d == -1) {
-                System.out.println("d == -1");
                 Thread.sleep(10000);
                 d = delais.get(site);
             }

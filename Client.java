@@ -33,6 +33,8 @@ public class Client extends UnicastRemoteObject implements Client_itf {
     }
 
     public static void write(Integer id, Object o) throws RemoteException {
+        // Ecrire au serveur et attendre acknowldgement
+        // Majorité ou touts les clients
         //if (server.isWriter(instanceClient))
             server.write(id, o);
     }
@@ -73,57 +75,17 @@ public class Client extends UnicastRemoteObject implements Client_itf {
     public void reportValue(int idObj, ReadCallback rcb) throws RemoteException {
 
         SharedObject so = sharedObjects.get(idObj);
+        System.out.println( Integer.parseInt(so.getVersion()) + ", " + so.getObj());
         so.reportValue(rcb);
-
-        /*
-         * int version = versions.get(idObj).get();
-         * Client_itf client = null;
-         * for (Client_itf c : clientsParticipants) {
-         * if (version < c.getVersion(idObj)) {
-         * version = c.getVersion(idObj);
-         * client = c;
-         * }
-         * 
-         * }
-         * if (client != null) {
-         * Object o = client.getObj(idObj);
-         * SharedObject so = sharedObjects.get(idObj);
-         * so.setObj(o);
-         * versions.get(so).set(version);
-         * }
-         */
+        //rcb.call(Integer.parseInt(so.getVersion()), so.getObj());
 
     }
 
-    /*
-     * This method will look for the client who has the highest version of an object
-     * and return the object
-     * 
-     * public static Object lookFor(int idObj) {
-     * int version = 0;
-     * Client_itf client = null;
-     * for (Client_itf c : clientsParticipants) {
-     * if (version < c.getVersion(idObj)) {
-     * version = c.getVersion(idObj);
-     * client = c;
-     * }
-     * 
-     * }
-     * return client.getObj(idObj);
-     * 
-     * }
-     */
-
     @Override
     public void update(int idObj, int version, Object valeur, WriteCallback wcb) throws RemoteException {
-       // wcb.ok();
         SharedObject so = sharedObjects.get(idObj);
-        so.setObj(valeur);
-        //versions.get(idObj).set(version);
-        so.setVersion(version);
 
-        System.out.println("objet : " + so.getObj());
-        System.out.println("version : " + so.getVersion() );
+        so.update(version, valeur, wcb);
     }
 
     @Override
@@ -191,7 +153,7 @@ public class Client extends UnicastRemoteObject implements Client_itf {
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
-
+        System.out.println("client::publish : " + id);
         return sharedObjects.get(id);
     }
 

@@ -30,6 +30,7 @@ public class Irc extends Frame {
 	public Irc(SharedObject s) {
 
 		setLayout(new FlowLayout());
+		setTitle(myName);
 
 		text = new TextArea(10, 60);
 		text.setEditable(false);
@@ -51,6 +52,12 @@ public class Irc extends Frame {
 		show();
 
 		sentence = s;
+		/*try {
+			Thread.sleep(10000);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+		sentence.write(myName + " : Concurrent access");*/
 	}
 }
 

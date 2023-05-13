@@ -1,6 +1,7 @@
 import java.rmi.RemoteException;
 
-public interface WriteCallback {
+public interface WriteCallback extends java.rmi.Remote{
+    void call() throws RemoteException;
 
-    public void ok() throws RemoteException;
+    int getResponseCounter() throws RemoteException;
 }
